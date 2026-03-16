@@ -1,8 +1,8 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
-import Man from '../components/Man'
-import Bag from '../components/Bag'
-import InputField, { IconMail, IconLock } from '../components/builder/InputField'
+import Man from '../builder/Man'
+import Bag from '../builder/Bag'
+import InputField, { IconMail, IconLock } from '../builder/InputField'
 import backImg from '/back.png'
 
 export default function Login() {
