@@ -1,0 +1,68 @@
+@import "tailwindcss";
+
+* {
+  font-family: 'Nunito', sans-serif;
+  box-sizing: border-box;
+}
+
+@keyframes manWalkIn {
+  0%   { left: -200px }
+  60%  { left: 30px   }
+  75%  { left: 18px   }
+  100% { left: 24px   }
+}
+@keyframes bagWalkIn {
+  0%   { left: -220px }
+  60%  { left: 115px  }
+  75%  { left: 103px  }
+  100% { left: 110px  }
+}
+@keyframes legL {
+  0%, 100% { transform: rotate(-18deg) }
+  50%       { transform: rotate(18deg)  }
+}
+@keyframes legR {
+  0%, 100% { transform: rotate(18deg)  }
+  50%       { transform: rotate(-18deg) }
+}
+@keyframes armL {
+  0%, 100% { transform: rotate(18deg)  }
+  50%       { transform: rotate(-18deg) }
+}
+@keyframes armR {
+  0%, 100% { transform: rotate(-18deg) }
+  50%       { transform: rotate(18deg)  }
+}
+@keyframes idleSway {
+  0%, 100% { transform: rotate(-1deg) }
+  50%       { transform: rotate(1deg)  }
+}
+@keyframes panelIn {
+  from { transform: scaleY(0) translateY(20px); opacity: 0; }
+  to   { transform: scaleY(1) translateY(0);    opacity: 1; }
+}
+@keyframes formRise {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0);    }
+}
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(40px); }
+  to   { opacity: 1; transform: translateY(0);    }
+}
+@keyframes cropIn {
+  from { opacity: 0; transform: scale(0.92); }
+  to   { opacity: 1; transform: scale(1);    }
+}
+
+.man-walk  { animation: manWalkIn 1.8s cubic-bezier(.4,0,.2,1) .3s forwards; }
+.bag-walk  { animation: bagWalkIn 1.8s cubic-bezier(.4,0,.2,1) .3s forwards; }
+.leg-l     { animation: legL 0.4s ease-in-out infinite; transform-origin: 42px 130px; }
+.leg-r     { animation: legR 0.4s ease-in-out infinite; transform-origin: 62px 130px; }
+.arm-l     { animation: armL 0.4s ease-in-out infinite; transform-origin: 35px 80px; }
+.arm-r     { animation: armR 0.4s ease-in-out infinite; transform-origin: 75px 80px; }
+.idle-sway { animation: idleSway 3s ease-in-out infinite; transform-origin: 55px 150px; }
+.panel-in  { animation: panelIn 0.65s cubic-bezier(.34,1.4,.64,1) both; transform-origin: bottom center; }
+.form-rise { animation: formRise 0.45s cubic-bezier(.34,1.4,.64,1) both; }
+.bag-lid   { transform-origin: 35px 14px; transition: transform 0.7s cubic-bezier(.34,1.2,.64,1); }
+.card-in   { animation: slideUp 0.7s cubic-bezier(.34,1.2,.64,1) both; }
+.crop-in   { animation: cropIn 0.3s cubic-bezier(.34,1.2,.64,1) both; }
