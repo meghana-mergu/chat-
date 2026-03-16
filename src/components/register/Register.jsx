@@ -1,7 +1,7 @@
 import { useState, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import InputField, { IconMail, IconLock, IconUser } from '../builder/InputField'
-import CropModal from '../components/CropModal'
+import CropModal from '../builder/CropModal'
 import backImg from '/back.png'
 
 const IconCamera = () => (
