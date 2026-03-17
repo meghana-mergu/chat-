@@ -4,6 +4,9 @@ import Man from '../builder/Man'
 import Bag from '../builder/Bag'
 import InputField, { IconMail, IconLock } from '../builder/InputField'
 import backImg from '/back.png'
+import { useDispatch } from "react-redux";
+import { loginUser } from "../../redux/authSlice";
+
 
 export default function Login() {
   const navigate = useNavigate()
@@ -68,9 +71,11 @@ export default function Login() {
     return errs
   }
 
+  const dispatch=useDispatch()
   const handleSubmit = () => {
     const errs = validate()
     if (Object.keys(errs).length) { setErrors(errs); return }
+     dispatch(loginUser(form));
     setErrors({})
     setLoading(true)
     setTimeout(() => setLoading(false), 1500)
