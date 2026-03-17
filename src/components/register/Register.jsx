@@ -3,6 +3,9 @@ import { useNavigate } from 'react-router-dom'
 import InputField, { IconMail, IconLock, IconUser } from '../builder/InputField'
 import CropModal from '../builder/CropModal'
 import backImg from '/back.png'
+import { useDispatch, useSelector } from "react-redux";
+import { registerUser } from "../../redux/authSlice";
+
 
 const IconCamera = () => (
   <svg className="w-7 h-7" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8}>
@@ -18,7 +21,7 @@ export default function Register() {
   const [errors, setErrors]         = useState({})
   const [profileImg, setProfileImg] = useState(null)
   const [cropSrc, setCropSrc]       = useState(null)
-  const [loading, setLoading]       = useState(false)
+  const [Loading, setLoading]       = useState(false)
   const fileRef = useRef(null)
 
   const ch = e => setForm(p => ({ ...p, [e.target.name]: e.target.value }))
@@ -35,13 +38,29 @@ export default function Register() {
     return errs
   }
 
-  const handleSubmit = () => {
-    const errs = validate()
-    if (Object.keys(errs).length) { setErrors(errs); return }
-    setErrors({})
-    setLoading(true)
-    setTimeout(() => setLoading(false), 1500)
+  const dispatch = useDispatch();
+const { loading, error } = useSelector((state) => state.auth);
+
+const handleSubmit = () => {
+  const errs = validate();
+  if (Object.keys(errs).length) {
+    setErrors(errs);
+    return;
   }
+
+  dispatch(registerUser({
+    ...form,
+    profileImg
+  }));
+};
+
+  // const handleSubmit = () => {
+  //   const errs = validate()
+  //   if (Object.keys(errs).length) { setErrors(errs); return }
+  //   setErrors({})
+  //   setLoading(true)
+  //   setTimeout(() => setLoading(false), 1500)
+  // }
 
   return (
     <>
