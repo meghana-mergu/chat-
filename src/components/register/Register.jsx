@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import InputField, { IconMail, IconLock, IconUser } from '../builder/InputField'
 import CropModal from '../builder/CropModal'
 import backImg from '/back.png'
-import toast from 'react-hot-toast/headless'
+import toast from 'react-hot-toast'
 import { useDispatch, useSelector } from "react-redux";
 import { registerUser } from "../../redux/authSlice";
 
@@ -60,11 +60,11 @@ const handleSubmit = async () => {
   }
   
   try {
-    const res = await dispatch(registerUser(formData)).unwrap();
+    const res = await dispatch(registerUser(formData));
 
     toast.success("Registered successfully 🎉", {
-      position: "top-right",
-      autoClose: 2000,
+      // position: "top-right",
+      // autoClose: 2000,
     });
 
     setTimeout(() => {
@@ -73,7 +73,7 @@ const handleSubmit = async () => {
 
   } catch (err) {
 
-    toast.error(err || "Registration failed ❌", {
+    toast.error(err?.message || "Registration failed ❌", {
       position: "top-right",
     });
   }
