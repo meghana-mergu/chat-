@@ -1,67 +1,79 @@
-import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
+import { createSlice } from "@reduxjs/toolkit";
 import { loginAPI, registerAPI } from "../services/authApi";
 
-/* 🔹 LOGIN */
-export const loginUser = createAsyncThunk(
-  "auth/loginUser",
-  async (data, { rejectWithValue }) => {
-    try {
-      return await loginAPI(data);
-    } catch (err) {
-      return rejectWithValue(err.message);
-    }
-  }
-);
-
-/* 🔹 REGISTER */
-export const registerUser = createAsyncThunk(
-  "auth/registerUser",
-  async (data, { rejectWithValue }) => {
-    try {
-      return await registerAPI(data);
-    } catch (err) {
-      return rejectWithValue(err.message);
-    }
-  }
-);
+const initialState = {
+  user: null,
+  loading: false,
+  error: null,
+  success: null, // ✅ for success message
+};
 
 const authSlice = createSlice({
   name: "auth",
-  initialState: {
-    user: null,
-    loading: false,
-    error: null,
-  },
-  reducers: {},
-  extraReducers: (builder) => {
-    builder
+  initialState,
+  reducers: {
+    setLoading: (state, action) => {
+      state.loading = action.payload;
+    },
 
-      /* LOGIN */
-      .addCase(loginUser.pending, (state) => {
-        state.loading = true;
-        state.error = null;
-      })
-      .addCase(loginUser.fulfilled, (state, action) => {
-        state.loading = false;
-        state.user = action.payload;
-      })
-      .addCase(loginUser.rejected, (state, action) => {
-        state.loading = false;
-        state.error = action.payload;
-      })
+    setUser: (state, action) => {
+      state.user = action.payload;
+      state.loading = false;
+      state.error = null;
+    },
 
-      /* REGISTER */
-      .addCase(registerUser.pending, (state) => {
-        state.loading = true;
-      })
-      .addCase(registerUser.fulfilled, (state) => {
-        state.loading = false;
-      })
-      .addCase(registerUser.rejected, (state, action) => {
-        state.loading = false;
-        state.error = action.payload;
-      });
+    setError: (state, action) => {
+      state.error = action.payload;
+      state.loading = false;
+    },
+
+    setSuccess: (state, action) => {
+      state.success = action.payload;
+      state.loading = false;
+      state.error = null;
+    },
+
+    logout: (state) => {
+      state.user = null;
+    },
   },
 });
 
+export const {
+  setLoading,
+  setUser,
+  setError,
+  setSuccess,
+  logout,
+} = authSlice.actions;
+
 export default authSlice.reducer;
+
+
+// ================== ASYNC FUNCTIONS ==================
+
+// LOGIN
+export const loginUser = (data) => async (dispatch) => {
+  try {
+    dispatch(setLoading(true));
+
+    const res = await loginAPI(data);
+
+    dispatch(setUser(res));
+  } catch (err) {
+    dispatch(setError(err));
+  }
+};
+
+// REGISTER
+export const registerUser = (data) => async (dispatch) => {
+  try {
+    dispatch(setLoading(true));
+
+    const res = await registerAPI(data);
+
+    dispatch(setSuccess(res.message || "Registered Successfully"));
+  } catch (err) {
+    dispatch(setError(err));
+  }
+};
