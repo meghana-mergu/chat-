@@ -68,7 +68,7 @@ const handleSubmit = async () => {
     });
 
     setTimeout(() => {
-      navigate("/verify-otp");
+      navigate("/verify");
     }, 2000);
 
   } catch (err) {
