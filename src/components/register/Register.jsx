@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import InputField, { IconMail, IconLock, IconUser } from '../builder/InputField'
 import CropModal from '../builder/CropModal'
 import backImg from '/back.png'
+import toast from 'react-hot-toast/headless'
 import { useDispatch, useSelector } from "react-redux";
 import { registerUser } from "../../redux/authSlice";
 
@@ -41,27 +42,43 @@ export default function Register() {
   const dispatch = useDispatch();
 const { loading, error } = useSelector((state) => state.auth);
 
-const handleSubmit = () => {
+const handleSubmit = async () => {
   const errs = validate();
   if (Object.keys(errs).length) {
     setErrors(errs);
     return;
   }
 
-  dispatch(registerUser({
-    ...form,
-    profileImg
-  }));
+  const formData = new FormData();
+
+  formData.append("name", form.name);
+  formData.append("email", form.email);
+  formData.append("password", form.password);
+
+  if (profileImg) {
+    formData.append("profilePic", profileImg);
+  }
+  
+  try {
+    const res = await dispatch(registerUser(formData)).unwrap();
+
+    toast.success("Registered successfully 🎉", {
+      position: "top-right",
+      autoClose: 2000,
+    });
+
+    setTimeout(() => {
+      navigate("/verify-otp");
+    }, 2000);
+
+  } catch (err) {
+
+    toast.error(err || "Registration failed ❌", {
+      position: "top-right",
+    });
+  }
 };
-
-  // const handleSubmit = () => {
-  //   const errs = validate()
-  //   if (Object.keys(errs).length) { setErrors(errs); return }
-  //   setErrors({})
-  //   setLoading(true)
-  //   setTimeout(() => setLoading(false), 1500)
-  // }
-
+  
   return (
     <>
       {cropSrc && (
@@ -80,10 +97,10 @@ const handleSubmit = () => {
           backgroundPosition: 'center',
         }}
       >
-        {/* Light overlay */}
+
         <div className="absolute inset-0 bg-white/10 pointer-events-none" />
 
-        {/* Card */}
+
         <div
           className="card-in relative z-10 overflow-hidden"
           style={{
@@ -171,7 +188,6 @@ const handleSubmit = () => {
                 <span className="font-semibold text-rose-400">(optional)</span>
               </p>
 
-              {/* Upload circle */}
               <div
                 onClick={() => fileRef.current?.click()}
                 className="w-28 h-28 rounded-full flex items-center justify-center cursor-pointer overflow-hidden transition-all duration-200 hover:scale-105"
@@ -199,32 +215,23 @@ const handleSubmit = () => {
                 </div>
               )}
 
-              {/* Upload button */}
               <button
                 onClick={() => fileRef.current?.click()}
                 className="px-4 py-2 rounded-xl text-xs font-extrabold text-white bg-gradient-to-r from-rose-500 to-pink-500 shadow-lg shadow-rose-400/40 hover:-translate-y-0.5 hover:shadow-rose-400/60 transition-all duration-200 whitespace-nowrap cursor-pointer"
-              >
-                {profileImg ? '✏️ Change' : '📷 Upload'}
-              </button>
+              >{profileImg ? '✏️ Change' : '📷 Upload'}</button>
 
               {profileImg && (
                 <button
                   onClick={() => setProfileImg(null)}
-                  className="text-[11px] font-bold text-rose-400 underline underline-offset-2 hover:text-rose-600 transition-colors bg-transparent border-none cursor-pointer"
-                >
-                  Remove
-                </button>
+                  className="text-[11px] font-bold text-rose-400 underline underline-offset-2 hover:text-rose-600 transition-colors bg-transparent border-none cursor-pointer">Remove</button>
               )}
 
               <p className="text-[10px] text-rose-300 text-center leading-relaxed">
                 Auto cropped<br />to a circle ✨
               </p>
 
-              <input
-                ref={fileRef} type="file" accept="image/*" className="hidden"
-                onChange={e => {
-                  const f = e.target.files[0]
-                  if (!f) return
+              <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={e => { const f = e.target.files[0] 
+                if (!f) return
                   const r = new FileReader()
                   r.onload = ev => setCropSrc(ev.target.result)
                   r.readAsDataURL(f)
