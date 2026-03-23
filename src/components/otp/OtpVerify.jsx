@@ -1,6 +1,5 @@
 import { useState, useRef, useEffect } from "react";
 
-const CORRECT_OTP = "123456";
 
 export default function OTPVerify() {
   const [otp, setOtp] = useState(["", "", "", "", "", ""]);
@@ -59,25 +58,52 @@ export default function OTPVerify() {
     (next !== -1 ? inputsRef.current[next] : inputsRef.current[5]).focus();
   };
 
+  // const handleSubmit = async () => {
+  //   if (!isComplete || status === "loading") return;
+  //   setStatus("loading");
+  //   await new Promise((r) => setTimeout(r, 1500));
+  //   if (otp.join("") === CORRECT_OTP) {
+  //     setStatus("success");
+  //     showToast("🎉 Verified! Welcome aboard.", "success");
+  //   } else {
+  //     setStatus("error");
+  //     setShake(true);
+  //     showToast("✗ Incorrect code. Please try again.", "error");
+  //     setTimeout(() => {
+  //       setShake(false);
+  //       setStatus("idle");
+  //       setOtp(["", "", "", "", "", ""]);
+  //       inputsRef.current[0]?.focus();
+  //     }, 650);
+  //   }
+  // };
+
   const handleSubmit = async () => {
-    if (!isComplete || status === "loading") return;
-    setStatus("loading");
-    await new Promise((r) => setTimeout(r, 1500));
-    if (otp.join("") === CORRECT_OTP) {
-      setStatus("success");
-      showToast("🎉 Verified! Welcome aboard.", "success");
-    } else {
-      setStatus("error");
-      setShake(true);
-      showToast("✗ Incorrect code. Please try again.", "error");
-      setTimeout(() => {
-        setShake(false);
-        setStatus("idle");
-        setOtp(["", "", "", "", "", ""]);
-        inputsRef.current[0]?.focus();
-      }, 650);
-    }
-  };
+  const enteredOtp = otp.join("").trim(); // ✅ always get latest value
+
+  if (enteredOtp.length !== 6 || status === "loading") return;
+
+  setStatus("loading");
+
+  await new Promise((r) => setTimeout(r, 1500));
+
+  // ✅ Accept ANY 6-digit OTP (0–9)
+  if (/^\d{6}$/.test(enteredOtp)) {
+    setStatus("success");
+    showToast("🎉 Verified! Welcome aboard.", "success");
+  } else {
+    setStatus("error");
+    setShake(true);
+    showToast("✗ Invalid OTP. Please try again.", "error");
+
+    setTimeout(() => {
+      setShake(false);
+      setStatus("idle");
+      setOtp(["", "", "", "", "", ""]);
+      inputsRef.current[0]?.focus();
+    }, 650);
+  }
+};
 
   const handleResend = () => {
     if (resendTimer > 0) return;
@@ -446,3 +472,5 @@ export default function OTPVerify() {
     </>
   );
 }
+
+  
