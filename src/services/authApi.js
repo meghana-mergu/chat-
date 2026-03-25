@@ -1,6 +1,6 @@
 import axios from "axios";
 
-const BASE_URL = "http://192.168.0.206";
+const BASE_URL = "http://192.168.0.121";
 
 export const loginAPI = async (data) => {
   try {
@@ -28,5 +28,25 @@ export const registerAPI = async (data) => {
     return res.data;
   } catch (err) {
     throw err.response?.data?.message || "Register failed";
+  }
+};
+
+// --- Dashboard APIs ---
+
+export const getContactsAPI = async (userId) => {
+  try {
+    const res = await axios.get(`${BASE_URL}:5000/api/chat/sendMessages/${userId}`);
+    return res.data;
+  } catch (err) {
+    throw err.response?.data?.message || "Failed to fetch contacts";
+  }
+};
+
+export const getMessagesAPI = async (roomId) => {
+  try {
+    const res = await axios.get(`${BASE_URL}:5000/api/chat/messages/${roomId}`);
+    return res.data;
+  } catch (err) {
+    throw err.response?.data?.message || "Failed to fetch messages";
   }
 };
