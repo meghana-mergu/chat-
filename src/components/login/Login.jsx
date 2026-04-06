@@ -72,14 +72,39 @@ export default function Login() {
   }
 
   const dispatch=useDispatch()
-  const handleSubmit = () => {
-    const errs = validate()
-    if (Object.keys(errs).length) { setErrors(errs); return }
-     dispatch(loginUser(form));
-    setErrors({})
-    setLoading(true)
-    setTimeout(() => setLoading(false), 1500)
+  const handleSubmit = async () => {
+  const errs = validate()
+  if (Object.keys(errs).length) {
+    setErrors(errs)
+    return
   }
+
+  try {
+    setLoading(true)
+    const res =await dispatch(loginUser(form))
+    
+    console.log("Login success:", res)
+    console.log("Login response structure:", JSON.stringify(res, null, 2))
+    // Store user data in localStorage for persistence
+    localStorage.setItem("user", JSON.stringify(res))
+    console.log("Stored in localStorage:", localStorage.getItem("user"))
+    navigate("/chat") // or wherever
+
+  } catch (err) {
+    console.error("Login failed:", err)
+    setErrors({ general: err.message || "Login failed" })
+  } finally {
+    setLoading(false)
+  }
+}
+  // const handleSubmit = () => {
+  //   const errs = validate()
+  //   if (Object.keys(errs).length) { setErrors(errs); return }
+  //    dispatch(loginUser(form));
+  //   setErrors({})
+  //   setLoading(true)
+  //   setTimeout(() => setLoading(false), 1500)
+  // }
 
   const isWalking = phase === 'walking'
   const isDropped = phase !== 'walking'

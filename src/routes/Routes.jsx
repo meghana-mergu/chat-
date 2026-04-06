@@ -3,6 +3,7 @@ import Login from "../components/login/Login";
 import Register from "../components/register/Register";
 import OTPVerify from "../components/otp/OtpVerify";
 import ChatDashboard from "../components/chat/ChatDashboard";
+// import MSG from "../components/chat/Msg";
 
 
 const routes= createBrowserRouter([
@@ -18,6 +19,9 @@ const routes= createBrowserRouter([
     },{
         path:"/chat",
         element:<ChatDashboard></ChatDashboard>
+    },{
+        // path:"/MSG",
+        // element:<MSG></MSG>
     },{
         path:"*",
         element:<Navigate to="/" replace></Navigate>

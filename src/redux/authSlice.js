@@ -60,8 +60,10 @@ export const loginUser = (data) => async (dispatch) => {
     const res = await loginAPI(data);
 
     dispatch(setUser(res));
+    return res;
   } catch (err) {
     dispatch(setError(err));
+    throw err;
   }
 };
 
@@ -73,7 +75,9 @@ export const registerUser = (data) => async (dispatch) => {
     const res = await registerAPI(data);
 
     dispatch(setSuccess(res.message || "Registered Successfully"));
+    return res;
   } catch (err) {
     dispatch(setError(err));
+    throw err;
   }
 };
