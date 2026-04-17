@@ -12,17 +12,10 @@ export const loginAPI = async (data) => {
 };
 
 export const registerAPI = async (data) => {
-  console.log(data);
-  
   try {
-    const res = await axios.post(`${BASE_URL}/api/auth/register`, data,
-      {
-        headers: {
-          "Content-Type": "multipart/form-data", 
-        },
-      }
-    );
-
+    // data should be FormData with: name, email, password, profileImage (file)
+    // Let axios set the Content-Type header with the correct multipart boundary.
+    const res = await axios.post(`${BASE_URL}/api/auth/register`, data);
     return res.data;
   } catch (err) {
     throw err.response?.data?.message || "Register failed";

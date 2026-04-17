@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
-import { setActiveUser, setSelectedContact } from '../counterSlice';
+import { setActiveUser, setSelectedContact } from '../../redux/chatSlice';
 import { io } from 'socket.io-client';
 import { useCollection, useLiveQuery } from 'ikago';
 import { getConversationId } from '../services/ikagoDb';
@@ -100,7 +100,7 @@ export default function HomePage() {
                         await cDB.add({
                             userId: data.fromUserId,
                             email: data.fromEmail || data.fromUserId,
-                            name: data.fromName || data.fromEmail || 'Unknown',
+                            name: data.fromName || (data.fromEmail ? data.fromEmail.split("@")[0] : null) || data.fromUserId || 'Someone',
                             unread: isActiveChat ? 0 : 1,
                             isRequest: true // first-ever message = chat request
                         });
@@ -292,12 +292,30 @@ export default function HomePage() {
     const getDisplayName = (u) => u?.name || u?.email?.split('@')[0] || 'User';
     const getProfilePic = (user) => {
         if (!user) return null;
-        if (user.profileImage?.data?.data) {
-            let b = ''; const bytes = new Uint8Array(user.profileImage.data.data);
-            for (let i = 0; i < bytes.byteLength; i++) b += String.fromCharCode(bytes[i]);
-            return `data:${user.profileImage.contentType};base64,${window.btoa(b)}`;
+        
+        // Check if profileImage is a file path or URL (saved as file on backend)
+        if (user.profileImage) {
+            if (typeof user.profileImage === 'string') {
+                // It's a file path/URL from backend
+                return user.profileImage.startsWith('http') 
+                    ? user.profileImage 
+                    : `https://mes-ioa3.onrender.com/${user.profileImage}`;
+            } else if (user.profileImage?.data?.data) {
+                // It's a buffer object (fallback for buffer format)
+                let b = ''; 
+                const bytes = new Uint8Array(user.profileImage.data.data);
+                for (let i = 0; i < bytes.byteLength; i++) b += String.fromCharCode(bytes[i]);
+                return `data:${user.profileImage.contentType};base64,${window.btoa(b)}`;
+            }
         }
-        if (user.profilePic) return user.profilePic.startsWith('http') ? user.profilePic : `https://mes-ioa3.onrender.com/${user.profilePic}`;
+        
+        // Fallback to profilePic if profileImage doesn't exist
+        if (user.profilePic) {
+            return user.profilePic.startsWith('http') 
+                ? user.profilePic 
+                : `https://mes-ioa3.onrender.com/${user.profilePic}`;
+        }
+        
         return null;
     };
 

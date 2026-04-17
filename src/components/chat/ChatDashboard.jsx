@@ -13,19 +13,69 @@ import { logout } from "../../redux/authSlice";
 /* ─── Avatar Component ────────────────────────────────────────────────────── */
 const initials = name => name ? name.split(" ").map(w => w[0]).join("").slice(0, 2).toUpperCase() : "U";
 
-const isValidName = name => typeof name === "string" && name.trim() && name.trim() !== "User" && !name.includes("...");
-const getPreferredName = (...names) => names.find(isValidName) || names.find(n => typeof n === "string" && n?.trim()) || "Unknown";
+const extractName = value => {
+  if (typeof value !== "string") return "";
+  const trimmed = value.trim();
+  if (!trimmed) return "";
+  if (trimmed.includes("@")) return trimmed.split("@")[0].trim();
+  return trimmed;
+};
+
+const isValidName = name => {
+  const cleaned = extractName(name);
+  if (!cleaned) return false;
+  const invalid = ["user", "unknown", "anonymous", "no name", "n/a", "null", "undefined"];
+  if (invalid.includes(cleaned.toLowerCase())) return false;
+  return !cleaned.includes("...");
+};
+
+const getPreferredName = (...names) => {
+  const valid = names.map(extractName).find(isValidName);
+  if (valid) return valid;
+  const fallback = names.map(extractName).find(Boolean);
+  return fallback || "Someone";
+};
+
+const displayName = (contact = {}) => getPreferredName(contact.name, contact.gmail, contact.email, contact.username, contact.userName, contact.userId, contact.id);
+
+const isImageUrl = (avatar) => typeof avatar === "string" && (
+  avatar.startsWith("http") ||
+  avatar.startsWith("data:") ||
+  avatar.startsWith("/") ||
+  avatar.includes("base64") ||
+  /\.(jpeg|jpg|png|gif|webp|svg|bmp|avif|apng)(\?.*)?$/i.test(avatar)
+);
 
 function Avatar({ c, size = 42 }) {
+  const avatar = c?.avatar;
+  const isImageAvatar = typeof avatar === "string" && (
+    avatar.startsWith("http") ||
+    avatar.startsWith("data:") ||
+    avatar.startsWith("/") ||
+    avatar.includes("base64") ||
+    /\.(jpeg|jpg|png|gif|webp|svg|bmp|avif|apng)(\?.*)?$/i.test(avatar)
+  );
+
   return (
     <div style={{
       width: size, height: size, borderRadius: "50%", flexShrink: 0,
-      background: c.color || "#f43f5e", // Rose primary accent
+      background: isImageAvatar ? "#f43f5e" : c.color || "#f43f5e",
       display: "flex", alignItems: "center", justifyContent: "center",
       fontSize: size * 0.33, fontWeight: 700, color: "#fff",
       letterSpacing: "0.5px", userSelect: "none",
+      overflow: "hidden",
       boxShadow: "0 4px 10px rgba(244,63,94,0.3)"
-    }}>{c.avatar || initials(c.name)}</div>
+    }}>
+      {isImageAvatar ? (
+        <img
+          src={avatar}
+          alt={c?.name || "Avatar"}
+          style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: "50%" }}
+        />
+      ) : (
+        avatar || initials(c?.name)
+      )}
+    </div>
   );
 }
 
@@ -68,6 +118,8 @@ export default function ChatDashboard() {
   const [toast, setToast] = useState(null);
   const [music, setMusic] = useState({ songId: null, isPlaying: false, currentTime: 0 });
   const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const [profileOpen, setProfileOpen] = useState(false);
+  const [emojiPickerOpen, setEmojiPickerOpen] = useState(false);
   const [previewMedia, setPreviewMedia] = useState(null);
   const [recording, setRecording] = useState(false);
   const [recordingTime, setRecordingTime] = useState(0);
@@ -85,14 +137,46 @@ export default function ChatDashboard() {
   const [searchResult, setSearchResult] = useState(null);
   const [isSearchingUser, setIsSearchingUser] = useState(false);
 
+  const getProfilePic = (user) => {
+    if (!user) return null
+    
+    // Check if profileImage is a file path or URL (saved as file on backend)
+    if (user.profileImage) {
+      if (typeof user.profileImage === 'string') {
+        // It's a file path/URL from backend
+        return user.profileImage.startsWith('http')
+          ? user.profileImage
+          : `https://mes-ioa3.onrender.com/${user.profileImage}`
+      } else if (user.profileImage?.data?.data) {
+        // It's a buffer object (fallback for buffer format)
+        let b = ''
+        const bytes = new Uint8Array(user.profileImage.data.data)
+        for (let i = 0; i < bytes.length; i += 1) {
+          b += String.fromCharCode(bytes[i])
+        }
+        return `data:${user.profileImage.contentType};base64,${window.btoa(b)}`
+      }
+    }
+    
+    // Fallback to profilePic if profileImage doesn't exist
+    if (user.profilePic) {
+      return user.profilePic.startsWith('http')
+        ? user.profilePic
+        : `https://mes-ioa3.onrender.com/${user.profilePic}`
+    }
+    
+    return null
+  }
+
   // Get real user from localStorage
   const savedUser = JSON.parse(localStorage.getItem("user") || "{}");
+  const authUser = savedUser.user || savedUser
   const currentUser = {
-    id: savedUser.user?.id || savedUser.user?._id || savedUser._id || savedUser.id || "me",
-    name: savedUser.user?.name || savedUser.name || "Me",
-    avatar: savedUser.user?.profilePic || savedUser.profilePic || "M",
+    id: authUser?.id || authUser?._id || "me",
+    name: authUser?.name || "Me",
+    avatar: getProfilePic(authUser) || "M",
     color: "#f43f5e",
-    email: savedUser.user?.email || savedUser.email
+    email: authUser?.email
   };
 
   const normalizeContact = (contact) => {
@@ -102,15 +186,18 @@ export default function ChatDashboard() {
     if (contact.status === "online") {
       displayLastSeen = "online";
     } else if (lastSeenDate) {
-      try {
-        const date = new Date(lastSeenDate);
+      const date = new Date(lastSeenDate);
+      if (!Number.isNaN(date.getTime())) {
         const now = new Date();
-        const diffMins = Math.floor((now - date) / 60000);
-        if (diffMins < 1) displayLastSeen = "just now";
-        else if (diffMins < 60) displayLastSeen = `${diffMins}m ago`;
-        else if (diffMins < 1440) displayLastSeen = `${Math.floor(diffMins / 60)}h ago`;
-        else displayLastSeen = `${Math.floor(diffMins / 1440)}d ago`;
-      } catch (e) {
+        const diffMinutes = Math.floor((now - date) / 60000);
+        if (diffMinutes < 1) displayLastSeen = "just now";
+        else if (diffMinutes < 60) displayLastSeen = `${diffMinutes}m ago`;
+        else if (diffMinutes < 1440) displayLastSeen = `${Math.floor(diffMinutes / 60)}h ago`;
+        else {
+          const diffDays = Math.floor(diffMinutes / 1440);
+          displayLastSeen = diffDays === 1 ? "1 day ago" : `${diffDays} days ago`;
+        }
+      } else {
         displayLastSeen = "last seen recently";
       }
     }
@@ -136,6 +223,9 @@ export default function ChatDashboard() {
       message.clientId ||
       `${message.senderId || message.fromUserId || "unknown"}-${Date.now()}`,
     senderId: message.senderId || message.fromUserId || message.from || "",
+    senderEmail: message.senderEmail || message.fromEmail || message.email || "",
+    receiverId: message.receiverId || message.toUserId || message.to || "",
+    receiverEmail: message.receiverEmail || message.toEmail || "",
     text: message.message || message.text || "",
     type: message.type || "text",
     timestamp:
@@ -159,6 +249,17 @@ export default function ChatDashboard() {
     return Array.from(map.values());
   };
 
+  const dedupeMessages = (messagesList) => {
+    const seen = new Set();
+    return messagesList.filter(msg => {
+      // Create a unique key based on senderId, timestamp, and text
+      const key = `${msg.senderId || msg.fromUserId}-${msg.timestamp}-${msg.text || ""}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  };
+
   // 2. Load data from IndexedDB on mount
   useEffect(() => {
     const loadData = async () => {
@@ -169,12 +270,16 @@ export default function ChatDashboard() {
         const messagesData = await getAllMessagesFromDB();
         const grouped = {};
         messagesData.forEach(msg => {
-          const otherId = msg.senderId === currentUser.id ? msg.receiverId : msg.senderId;
+          const otherId = msg.contactId || (msg.senderId === currentUser.id ? msg.receiverId : msg.senderId);
           if (!otherId) return;
           if (!grouped[otherId]) grouped[otherId] = [];
           grouped[otherId].push(msg);
         });
-        Object.values(grouped).forEach(arr => arr.sort((a,b) => new Date(a.timestamp) - new Date(b.timestamp)));
+        // Deduplicate messages in each conversation
+        Object.keys(grouped).forEach(key => {
+          grouped[key] = dedupeMessages(grouped[key]);
+          grouped[key].sort((a,b) => new Date(a.timestamp) - new Date(b.timestamp));
+        });
         setMessages(grouped);
       } catch (err) {
         console.error("Failed to load DB data:", err);
@@ -223,10 +328,9 @@ export default function ChatDashboard() {
       const mergeContact = (existing) => ({
         ...existing,
         ...incomingContact,
-        name: getPreferredName(incomingContact.name, existing.name, existing.fullName, msg.fromEmail, msg.email, msg.senderEmail, "Unknown"),
-        updatedAt: msg.createdAt || new Date().toISOString(),
+        name: getPreferredName(incomingContact.name, existing.name, existing.fullName, msg.fromEmail, msg.email, msg.senderEmail),
       });
-      
+
       setContacts(prev => {
         // First, check if there's an existing contact with the email as ID (temporary contact)
         const emailContact = prev.find(c => c.gmail === msg.fromEmail && c.id === msg.fromEmail);
@@ -269,10 +373,10 @@ export default function ChatDashboard() {
           // Check if contact already exists with proper ID
           const existing = prev.find(c => c.id === roomId);
           if (existing) {
-            const contactName = getPreferredName(incomingContact.name, existing.name, existing.fullName, msg.fromEmail, msg.email, msg.senderEmail, "Unknown");
+            const contactName = getPreferredName(incomingContact.name, existing.name, existing.fullName, msg.fromEmail, msg.email, msg.senderEmail);
             return prev.map(c => c.id === roomId ? { ...c, ...incomingContact, name: contactName } : c);
           } else {
-            const contactName = getPreferredName(incomingContact.name, msg.fromEmail, msg.email, msg.senderEmail, "Unknown");
+            const contactName = getPreferredName(incomingContact.name, msg.fromEmail, msg.email, msg.senderEmail);
             return [...prev, { ...incomingContact, name: contactName, color: "#f43f5e" }];
           }
         }
@@ -283,7 +387,9 @@ export default function ChatDashboard() {
       const nextMsg = {
         id: `${msg.fromUserId}-${msg.createdAt}-${Math.random()}`,
         senderId: msg.fromUserId,
+        senderEmail: msg.fromEmail || msg.email || msg.senderEmail || "",
         receiverId: currentUser.id,
+        receiverEmail: currentUser.email || "",
         text: msg.message,
         type: msg.type
           ? msg.type
@@ -295,13 +401,22 @@ export default function ChatDashboard() {
                 ? "file"
                 : "text",
         timestamp: msg.createdAt || new Date().toISOString(),
-        status: "received"
+        status: roomId === active ? "read" : "received"
       };
       
-      setMessages(prev => ({
-        ...prev,
-        [roomId]: [...(prev[roomId] || []), nextMsg]
-      }));
+      setMessages(prev => {
+        const existing = prev[roomId] || [];
+        // Check if this message already exists
+        const msgKey = `${nextMsg.senderId || nextMsg.fromUserId}-${nextMsg.timestamp}-${nextMsg.text || ""}`;
+        const isDuplicate = existing.some(m => `${m.senderId || m.fromUserId}-${m.timestamp}-${m.text || ""}` === msgKey);
+        
+        if (isDuplicate) return prev; // Skip if duplicate
+        
+        return {
+          ...prev,
+          [roomId]: [...existing, nextMsg]
+        };
+      });
       
       await saveMessageToDB(roomId, nextMsg);
 
@@ -368,29 +483,15 @@ export default function ChatDashboard() {
               return {
                 ...c,
                 id: toUserId,
-                name: c.name || c.gmail || c.email || "Unknown",
+                name: displayName(c) || toEmail?.split("@")[0] || toUserId || "Someone",
               };
             }
             return c;
           });
-          
-          if (updated) {
-            setActive(curr => curr === toEmail ? toUserId : curr);
-            setMessages(mPrev => {
-               if (mPrev[toEmail]) {
-                  const toMove = mPrev[toEmail];
-                  const newMap = { ...mPrev, [toUserId]: [...(mPrev[toUserId] || []), ...toMove.map(m => ({ ...m, contactId: toUserId }))] };
-                  delete newMap[toEmail];
-                  saveMessagesToDB(toUserId, newMap[toUserId]);
-                  // clean up old temporary mapped ones from indexedDB
-                  import("../../services/db").then(mb => mb.saveMessagesToDB(toEmail, [])).catch(e => console.log(e));
-                  return newMap;
-               }
-               return mPrev;
-            });
-            const theContact = next.find(c => c.id === toUserId);
-            if (theContact) saveContactToDB(theContact);
-          }
+
+          const theContact = next.find(c => c.id === toUserId);
+          if (theContact) saveContactToDB(theContact);
+
           return next;
         });
       }
@@ -461,15 +562,30 @@ export default function ChatDashboard() {
     return () => document.removeEventListener("click", handleOutsideClick);
   }, [userMenuOpen]);
 
-  const contact = contacts.find(c => c.id === active) || (active && active.includes("@") ? {
-    id: active,
-    name: active.split("@")[0],
-    gmail: active,
-    status: "offline",
-    color: "#f43f5e",
-    bio: "Not added yet",
-  } : null);
   const msgs = active ? (messages[active] || []) : [];
+  const activeMessage = msgs.find(m => m.fromEmail || m.email || m.senderEmail || m.fromName || m.senderName || m.fullName) || null;
+
+  const contact = contacts.find(c => c.id === active)
+    || (active && active.includes("@") ? {
+      id: active,
+      name: active.split("@")[0],
+      gmail: active,
+      status: "offline",
+      color: "#f43f5e",
+      bio: "Not added yet",
+    } : activeMessage ? {
+      id: active,
+      name: displayName({
+        name: activeMessage.fromName || activeMessage.senderName || activeMessage.fullName,
+        gmail: activeMessage.fromEmail || activeMessage.email || activeMessage.senderEmail,
+        userName: activeMessage.userName || activeMessage.fromUserName || activeMessage.senderUsername,
+        userId: activeMessage.fromUserId || activeMessage.senderId || activeMessage.userId,
+      }),
+      gmail: activeMessage.fromEmail || activeMessage.email || activeMessage.senderEmail,
+      status: "offline",
+      color: "#f43f5e",
+      bio: "Not added yet",
+    } : null);
 
   useEffect(() => { endRef.current?.scrollIntoView({ behavior: "smooth" }); }, [msgs, typing]);
 
@@ -550,9 +666,15 @@ export default function ChatDashboard() {
     if (!active) return;
     const dataUrl = await blobToDataURL(blob);
 
+    const isEmail = active && active.includes("@");
+    const receiverEmail = isEmail ? active : (contact?.gmail || contact?.email || undefined);
+
     const outgoing = {
       id: Date.now(),
       senderId: currentUser.id,
+      senderEmail: currentUser.email || "",
+      receiverId: active,
+      receiverEmail: receiverEmail || "",
       text: dataUrl,
       type: "audio",
       timestamp: new Date().toISOString(),
@@ -565,7 +687,6 @@ export default function ChatDashboard() {
       return { ...p, [active]: nextMsgs };
     });
 
-    const isEmail = active && active.includes("@");
     const payload = {
       fromUserId: currentUser.id,
       fromName: currentUser.name,
@@ -593,16 +714,19 @@ export default function ChatDashboard() {
     }
   }, [active, currentUser.id, currentUser.name, currentUser.email, contact?.gmail, contact?.email]);
 
-  const send = useCallback(() => {
-    if (!input.trim() || !active) return;
+  const sendText = useCallback((text) => {
+    if (!text.trim() || !active) return;
 
-    const text = input.trim();
-    setInput(""); // Clear input early for better UX
+    const isEmail = active && active.includes("@");
+    const receiverEmail = isEmail ? active : (contact?.gmail || contact?.email || undefined);
 
     const outgoing = {
       id: Date.now(),
       senderId: currentUser.id,
-      text,
+      senderEmail: currentUser.email || "",
+      receiverId: active,
+      receiverEmail: receiverEmail || "",
+      text: text.trim(),
       type: "text",
       timestamp: new Date().toISOString(),
       status: "sending",
@@ -614,14 +738,13 @@ export default function ChatDashboard() {
       return { ...p, [active]: nextMsgs };
     });
 
-    const isEmail = active && active.includes("@");
     const payload = {
       fromUserId: currentUser.id,
       fromName: currentUser.name,
       fromEmail: currentUser.email,
       toUserId: isEmail ? undefined : active,
       toEmail: isEmail ? active : (contact?.gmail || contact?.email || undefined),
-      message: text,
+      message: text.trim(),
       type: "text",
       createdAt: new Date().toISOString(),
     };
@@ -632,32 +755,32 @@ export default function ChatDashboard() {
     }
 
     if (isEmail) {
-      console.log("[Socket] Sending message by email:", { fromUserId: currentUser.id, toEmail: payload.toEmail, message: text });
+      console.log("[Socket] Sending message by email:", { fromUserId: currentUser.id, toEmail: payload.toEmail, message: text.trim() });
       socket.emit("send-message-by-email", {
         fromUserId: currentUser.id,
         fromName: currentUser.name,
         fromEmail: currentUser.email,
         toEmail: payload.toEmail,
-        message: text,
+        message: text.trim(),
         type: "text"
       });
     } else {
       console.log("[Socket] Sending private message:", payload);
       socket.emit("send-private-message", payload);
     }
-  }, [input, active, currentUser.id, currentUser.email, currentUser.name, contact?.gmail, contact?.email]);
+  }, [active, currentUser.id, currentUser.email, currentUser.name, contact?.gmail, contact?.email]);
+
+  const send = useCallback(() => {
+    if (!input.trim() || !active) return;
+    sendText(input);
+    setInput("");
+  }, [input, active, sendText]);
 
   const fileInputRef = useRef(null);
 
   const handleFileAttachment = (e) => {
     const file = e.target.files[0];
     if (!file || !active) return;
-    const MAX_BYTES = 1000 * 1024; // 1 MB limit for sockets
-    if (file.size > MAX_BYTES) {
-      setToast("File too large (max 1 MB)");
-      setTimeout(() => setToast(null), 3000);
-      return;
-    }
     const reader = new FileReader();
     reader.onload = (ev) => {
       const dataUrl = ev.target.result;
@@ -668,9 +791,15 @@ export default function ChatDashboard() {
           : file.type.startsWith("audio/")
             ? "audio"
             : "file";
+      const isEmail = active && active.includes("@");
+      const receiverEmail = isEmail ? active : (contact?.gmail || contact?.email || undefined);
+
       const outgoing = {
         id: Date.now(),
         senderId: currentUser.id,
+        senderEmail: currentUser.email || "",
+        receiverId: active,
+        receiverEmail: receiverEmail || "",
         text: dataUrl,
         type: t,
         timestamp: new Date().toISOString(),
@@ -682,7 +811,6 @@ export default function ChatDashboard() {
         return { ...p, [active]: nextMsgs };
       });
       if (socket) {
-        const isEmail = active && active.includes("@");
         const filePayload = {
           fromUserId: currentUser.id,
           fromName: currentUser.name,
@@ -775,6 +903,22 @@ export default function ChatDashboard() {
     .filter(c => (c.name || "").toLowerCase().includes(search.toLowerCase()) || (c.gmail || "").toLowerCase().includes(search.toLowerCase()));
   const lastMsg = id => { const m = messages[id] || []; return m[m.length - 1] || null; };
   const unread = id => (messages[id] || []).filter(m => m.senderId !== currentUser.id && m.status !== "read").length;
+
+  useEffect(() => {
+    if (!active) return;
+    const conversation = messages[active] || [];
+    const needsRead = conversation.some(m => m.senderId !== currentUser.id && m.status !== "read");
+    if (!needsRead) return;
+
+    const updated = conversation.map(m =>
+      m.senderId !== currentUser.id && m.status !== "read"
+        ? { ...m, status: "read" }
+        : m
+    );
+
+    setMessages(prev => ({ ...prev, [active]: updated }));
+    saveMessagesToDB(active, updated).catch(err => console.error("Failed to mark messages read:", err));
+  }, [active, messages, currentUser.id]);
 
   // Logout handler
   const handleLogout = () => {
@@ -976,7 +1120,7 @@ export default function ChatDashboard() {
             {/* Top bar */}
             <div style={{ background: "rgba(255, 241, 242, 0.8)", padding: "16px 20px", display: "flex", alignItems: "center", justifyContent: "space-between", borderBottom: "1px solid #ffe4e6" }}>
               <div style={{ display: "flex", alignItems: "center", gap: 12, position: "relative" }}>
-                <div style={{ cursor: "pointer", position: "relative" }} onClick={() => setUserMenuOpen(v => !v)}>
+                <div style={{ cursor: "pointer", position: "relative" }} onClick={() => { setProfileOpen(true); setUserMenuOpen(false); }}>
                   <Avatar c={currentUser} size={42} />
                 </div>
                 <div>
@@ -1021,13 +1165,14 @@ export default function ChatDashboard() {
                 const lm = lastMsg(c.id);
                 const ur = unread(c.id);
                 const on = active === c.id;
+                const displayStatus = on ? "online" : "offline";
                 return (
                   <div key={c.id} className={`cr${on ? " on" : ""}`} onClick={() => { setActive(c.id); setInfoOpen(false); }}
                     style={{ padding: "12px 20px", display: "flex", alignItems: "center", gap: 14, cursor: "pointer", borderBottom: "1px solid rgba(255,228,230,0.5)", background: on ? "#fff1f2" : "transparent", transition: "all .2s" }}>
-                    <div style={{ position: "relative" }}><Avatar c={c} size={50} /><StatusDot status={c.status} /></div>
+                    <div style={{ position: "relative" }}><Avatar c={c} size={50} /><StatusDot status={displayStatus} /></div>
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
-                        <span style={{ color: "#4c0519", fontWeight: 700, fontSize: 15 }}>{c.name || c.gmail || c.email || "Unknown"}</span>
+                        <span style={{ color: "#4c0519", fontWeight: 700, fontSize: 15 }}>{displayName(c)}</span>
                         {lm && <span style={{ color: ur > 0 ? "#f43f5e" : "#fb7185", fontSize: 11, fontWeight: ur > 0 ? 700 : 500 }}>
                           {new Date().toDateString() === new Date(lm.timestamp).toDateString() ? new Date(lm.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Yesterday'}
                         </span>}
@@ -1069,12 +1214,12 @@ export default function ChatDashboard() {
                     <button className="ib" onClick={() => setSidebar(v => !v)} style={{ background: "none", border: "none", cursor: "pointer", color: "#fb7185", fontSize: 20, padding: "8px", transition: "all .2s" }}>☰</button>
                     <div style={{ position: "relative", cursor: "pointer" }} onClick={() => setInfoOpen(v => !v)}>
                       <Avatar c={contact} size={44} />
-                      <StatusDot status={contact.status} />
+                      <StatusDot status="online" />
                     </div>
                     <div style={{ cursor: "pointer" }} onClick={() => setInfoOpen(v => !v)}>
-                      <div style={{ color: "#4c0519", fontWeight: 800, fontSize: 16 }}>{contact.name || contact.gmail || "Unknown"}</div>
-                      <div style={{ color: Object.keys(typing).length > 0 ? "#f43f5e" : "#fb7185", fontSize: 12, fontWeight: Object.keys(typing).length > 0 ? 700 : 500 }}>
-                        {Object.keys(typing).length > 0 ? "Typing..." : contact.lastSeen}
+                      <div style={{ color: "#4c0519", fontWeight: 800, fontSize: 16 }}>{displayName(contact)}</div>
+                      <div style={{ color: "#f43f5e", fontSize: 12, fontWeight: 600 }}>
+                        {contact.gmail || contact.email || ""}
                       </div>
                     </div>
                   </div>
@@ -1218,8 +1363,19 @@ export default function ChatDashboard() {
                 )}
 
                 {/* Input bar */}
-                <div style={{ background: "rgba(255, 241, 242, 0.8)", padding: "12px 20px", display: "flex", alignItems: "flex-end", gap: 12, borderTop: "1px solid #ffe4e6", backdropFilter: "blur(4px)" }}>
-                  <button className="ib" style={{ background: "none", border: "none", cursor: "pointer", color: "#fb7185", fontSize: 24, padding: "8px", transition: "all .2s" }}>😊</button>
+                <div style={{ position: "relative", background: "rgba(255, 241, 242, 0.8)", padding: "12px 20px", display: "flex", alignItems: "flex-end", gap: 12, borderTop: "1px solid #ffe4e6", backdropFilter: "blur(4px)" }}>
+                  <button onClick={() => setEmojiPickerOpen(v => !v)} className="ib" style={{ background: "none", border: "none", cursor: "pointer", color: "#fb7185", fontSize: 24, padding: "8px", transition: "all .2s" }}>😊</button>
+                  {emojiPickerOpen && (
+                    <div style={{ position: "absolute", bottom: "56px", left: 0, width: 240, background: "#ffffff", border: "1px solid #fde2e8", borderRadius: 18, padding: 12, boxShadow: "0 18px 50px rgba(15,23,42,0.14)", zIndex: 50, transform: "translateY(-4px)" }}>
+                      <div style={{ display: "grid", gridTemplateColumns: "repeat(6, minmax(0, 1fr))", gap: 8 }}>
+                        {["😊","😂","😍","👍","🎉","🔥","😎","🙌","🥳","❤️","👏","🤔"].map((emoji) => (
+                          <button key={emoji} type="button" onClick={() => { sendText(emoji); setEmojiPickerOpen(false); }} style={{ width: 40, height: 40, borderRadius: 12, border: "1px solid #fde2e8", background: "#fff", cursor: "pointer", fontSize: 20, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                            {emoji}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                   <input type="file" ref={fileInputRef} onChange={handleFileAttachment} style={{ display: "none" }} />
                   <button onClick={() => fileInputRef.current?.click()} className="ib" style={{ background: "none", border: "none", cursor: "pointer", color: "#fb7185", fontSize: 22, padding: "8px", transition: "all .2s" }}>📎</button>
 
@@ -1261,7 +1417,7 @@ export default function ChatDashboard() {
 
               <div style={{ padding: "30px 20px 20px", display: "flex", flexDirection: "column", alignItems: "center", borderBottom: "1px solid #ffe4e6" }}>
                 <Avatar c={contact} size={84} />
-                <div style={{ color: "#4c0519", fontWeight: 800, fontSize: 20, mt: 16, marginTop: "16px" }}>{contact.name || contact.gmail || "Unknown"}</div>
+                <div style={{ color: "#4c0519", fontWeight: 800, fontSize: 20, mt: 16, marginTop: "16px" }}>{displayName(contact)}</div>
                 <div style={{ color: "#f43f5e", fontSize: 13, fontWeight: 600, marginTop: 4 }}>{contact.gmail}</div>
                 <div style={{ color: "#881337", fontSize: 13, marginTop: 8, opacity: 0.8, fontStyle: "italic", textAlign: "center" }}>{contact.bio || "Busy building dreams 💖"}</div>
                 <div style={{ marginTop: 14, width: "100%", background: "rgba(255,255,255,0.75)", borderRadius: 18, border: "1px solid #fbcfe8", padding: "12px 14px", boxShadow: "0 10px 24px rgba(244,63,94,0.08)" }}>
@@ -1269,10 +1425,12 @@ export default function ChatDashboard() {
                     <span>Your email</span>
                     <span style={{ color: "#c026d3", fontWeight: 700 }}>{currentUser.email || "Not set"}</span>
                   </div>
-                  <div style={{ display: "flex", justifyContent: "space-between", gap: 12, marginTop: 8, color: "#4c0519", fontSize: 13 }}>
-                    <span>Contact ID</span>
-                    <span style={{ fontWeight: 600 }}>{contact.id}</span>
-                  </div>
+                  {contact.gmail && (
+                    <div style={{ display: "flex", justifyContent: "space-between", gap: 12, marginTop: 8, color: "#4c0519", fontSize: 13 }}>
+                      <span>Contact email</span>
+                      <span style={{ fontWeight: 600 }}>{contact.gmail}</span>
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -1333,6 +1491,38 @@ export default function ChatDashboard() {
           {toast && (
             <div style={{ position: "fixed", bottom: 30, left: "50%", transform: "translateX(-50%)", background: "linear-gradient(135deg, #10b981 0%, #059669 100%)", color: "white", fontWeight: 700, fontSize: 14, padding: "14px 28px", borderRadius: 999, boxShadow: "0 12px 32px rgba(16,185,129,0.4)", animation: "toastIn .3s cubic-bezier(0.34,1.56,0.64,1)", zIndex: 200, whiteSpace: "nowrap", border: "1px solid #34d399" }}>
               {toast}
+            </div>
+          )}
+
+          {profileOpen && (
+            <div onClick={() => setProfileOpen(false)} style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.55)", zIndex: 300, display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
+              <div onClick={e => e.stopPropagation()} style={{ width: "100%", maxWidth: 520, background: "#ffffff", borderRadius: 28, boxShadow: "0 32px 80px rgba(15,23,42,0.18)", padding: 24, position: "relative" }}>
+                <button onClick={() => setProfileOpen(false)} style={{ position: "absolute", top: 18, right: 18, width: 36, height: 36, borderRadius: 12, border: "none", background: "#f8fafc", color: "#9ca3af", fontSize: 18, cursor: "pointer" }}>×</button>
+                <div style={{ display: "flex", gap: 18, alignItems: "center", marginBottom: 20 }}>
+                  <div style={{ width: 120, height: 120, borderRadius: "50%", overflow: "hidden", background: "#f43f5e", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                    {isImageUrl(currentUser.avatar) ? (
+                      <img src={currentUser.avatar} alt={currentUser.name || "Profile"} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                    ) : (
+                      <span style={{ color: "#ffffff", fontSize: 42, fontWeight: 800 }}>{currentUser.avatar || initials(currentUser.name)}</span>
+                    )}
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 22, fontWeight: 800, color: "#2c3a4b" }}>{currentUser.name || "Me"}</div>
+                    <div style={{ fontSize: 14, color: "#6b7280", marginTop: 4 }}>{currentUser.email || "No email available"}</div>
+                  </div>
+                </div>
+                <div style={{ display: "grid", gap: 12, marginTop: 8 }}>
+                  <div style={{ padding: 16, borderRadius: 18, background: "#f8fafc", border: "1px solid #e5e7eb" }}>
+                    <div style={{ fontSize: 12, fontWeight: 700, color: "#9d174d", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 4 }}>Email</div>
+                    <div style={{ fontSize: 15, color: "#334155" }}>{currentUser.email || "N/A"}</div>
+                  </div>
+                  <div style={{ padding: 16, borderRadius: 18, background: "#f8fafc", border: "1px solid #e5e7eb" }}>
+                    <div style={{ fontSize: 12, fontWeight: 700, color: "#9d174d", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 4 }}>Your Email</div>
+                    <div style={{ fontSize: 15, color: "#334155" }}>{currentUser.email || "Not set"}</div>
+                  </div>
+                </div>
+                <button onClick={handleLogout} style={{ marginTop: 24, width: "100%", padding: "14px 18px", borderRadius: 16, border: "none", background: "#f43f5e", color: "#ffffff", fontSize: 14, fontWeight: 700, cursor: "pointer" }}>Logout</button>
+              </div>
             </div>
           )}
         </div>
