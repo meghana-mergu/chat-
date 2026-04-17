@@ -1,11 +1,13 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
+import toast from 'react-hot-toast'
 import Man from '../builder/Man'
 import Bag from '../builder/Bag'
 import InputField, { IconMail, IconLock } from '../builder/InputField'
 import backImg from '/back.png'
 import { useDispatch } from "react-redux";
 import { loginUser } from "../../redux/authSlice";
+import { setActiveUser } from "../../redux/chatSlice";
 
 
 export default function Login() {
@@ -81,18 +83,17 @@ export default function Login() {
 
   try {
     setLoading(true)
-    const res =await dispatch(loginUser(form))
-    
-    console.log("Login success:", res)
-    console.log("Login response structure:", JSON.stringify(res, null, 2))
-    // Store user data in localStorage for persistence
-    localStorage.setItem("user", JSON.stringify(res))
-    console.log("Stored in localStorage:", localStorage.getItem("user"))
-    navigate("/chat") // or wherever
-
+    const res = await dispatch(loginUser(form))
+    const userData = res?.user || res
+    localStorage.setItem("user", JSON.stringify(userData))
+    dispatch(setActiveUser(userData))
+    toast.success("Login successful")
+    navigate("/chat")
   } catch (err) {
-    console.error("Login failed:", err)
-    setErrors({ general: err.message || "Login failed" })
+    const message = err?.message || err || "Login failed"
+    console.error("Login failed:", message)
+    setErrors({ general: message })
+    toast.error(message)
   } finally {
     setLoading(false)
   }
@@ -193,6 +194,11 @@ export default function Login() {
                 >
                   {loading ? 'Signing in…' : 'Login →'}
                 </button>
+                {errors.general && (
+                  <div className="mt-3 rounded-2xl border border-rose-200/80 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-700">
+                    {errors.general}
+                  </div>
+                )}
               </div>
 
               <div className="flex items-center gap-3 my-3">
